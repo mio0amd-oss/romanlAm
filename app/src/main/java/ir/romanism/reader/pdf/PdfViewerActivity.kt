@@ -45,7 +45,7 @@ class PdfViewerActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tvTitle).text = title
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
         findViewById<ImageButton>(R.id.btnSearch).setOnClickListener {
-            viewer?.setTextSearchActive(true)
+            viewer?.isTextSearchActive = true
         }
         findViewById<ImageButton>(R.id.btnShare).setOnClickListener { shareCurrent() }
 
@@ -61,7 +61,7 @@ class PdfViewerActivity : AppCompatActivity() {
 
         // فرگمنت باید کامل attach بشه تا setDocumentUri جواب بده
         Handler(Looper.getMainLooper()).postDelayed({
-            fragment.setDocumentUri(uri)
+            fragment.documentUri = uri
         }, 150)
     }
 
