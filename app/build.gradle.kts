@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "ir.romanism.reader"
     compileSdk = 36
+    compileSdkExtension = 19
 
     defaultConfig {
         applicationId = "ir.romanism.reader"
