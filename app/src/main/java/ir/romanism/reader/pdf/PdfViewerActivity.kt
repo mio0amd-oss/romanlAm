@@ -7,20 +7,21 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
 import androidx.pdf.viewer.fragment.PdfViewerFragment
 import ir.romanism.reader.R
-import java.io.File
 
 /**
  * ریدر PDF با کتابخونه‌ی رسمی Jetpack (androidx.pdf, نسخه‌ی beta):
  * زوم/اسکرول روان، جست‌وجوی متن، و انتخاب/کپی متن رو خود کتابخونه فراهم می‌کنه
  * (به‌جای رندر دستی صفحه به صفحه).
+ *
+ * ورودی همیشه یه content Uri‌ـه: چه فایلی که از سایت دانلود و با FileProvider
+ * ساخته شده، چه فایلی که مستقیم از حافظه‌ی گوشی با انتخابگر سیستم انتخاب شده.
  */
 class PdfViewerActivity : AppCompatActivity() {
 
     companion object {
-        const val EXTRA_PATH = "extra_path"
+        const val EXTRA_URI = "extra_uri"
         const val EXTRA_TITLE = "extra_title"
     }
 
@@ -31,10 +32,11 @@ class PdfViewerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pdf_viewer)
 
-        val path = intent.getStringExtra(EXTRA_PATH)
+        @Suppress("DEPRECATION")
+        val uri: Uri? = intent.getParcelableExtra(EXTRA_URI)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "کتاب"
 
-        if (path == null) {
+        if (uri == null) {
             toast("فایل PDF پیدا نشد")
             finish()
             return
@@ -52,21 +54,12 @@ class PdfViewerActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btnShare).setOnClickListener { shareCurrent() }
 
         try {
-            val file = File(path)
-            if (!file.exists() || file.length() == 0L) {
-                toast("فایل دانلود نشده یا خرابه")
-                finish()
-                return
-            }
-
-            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
             documentUri = uri
 
             val fragment = PdfViewerFragment()
             viewer = fragment
             // commitNow به‌جای commit: تراکنش رو فوری و همزمان اجرا می‌کنه،
-            // پس فرگمنت تضمینی attach شده و دیگه نیازی به تأخیر مصنوعی (postDelayed) نیست
-            // که منبع کرش‌های تصادفی بود.
+            // پس فرگمنت تضمینی attach شده و دیگه نیازی به تأخیر مصنوعی نیست.
             supportFragmentManager.beginTransaction()
                 .replace(R.id.pdfContainer, fragment, "pdf_viewer")
                 .commitNow()

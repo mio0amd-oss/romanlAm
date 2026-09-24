@@ -1,18 +1,29 @@
 package ir.romanism.reader
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import ir.romanism.reader.model.Post
 import ir.romanism.reader.network.PostsRepository
 import ir.romanism.reader.pdf.PdfViewerActivity
@@ -20,16 +31,55 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private val TAGS = listOf("صحنه_دار", "عاشقانه", "درخواستی", "مافیایی")
+private const val CRASH_LOG_FILE = "crash_log.txt"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        installCrashHandler(this)
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 AppRoot()
             }
         }
     }
+}
+
+/**
+ * هر کرش غیرمنتظره‌ای تو کل اپ (هر اکتیویتی) رو می‌گیره و متن کاملش رو
+ * تو یه فایل ذخیره می‌کنه، تا دفعه‌ی بعد که اپ باز شد نشونش بدیم —
+ * دیگه لازم نیست از لاگ گیت‌هاب یا اسکرین‌شات برای پیدا کردن خطا استفاده کنیم.
+ */
+private fun installCrashHandler(context: Context) {
+    val appContext = context.applicationContext
+    val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        try {
+            File(appContext.filesDir, CRASH_LOG_FILE).writeText(Log.getStackTraceString(throwable))
+        } catch (e: Exception) {
+            // اگه نوشتن فایل هم خطا داد، کاری از دستمون برنمیاد؛ بذار روند عادی کرش ادامه پیدا کنه
+        }
+        previousHandler?.uncaughtException(thread, throwable)
+    }
+}
+
+private fun readAndClearCrashLog(context: Context): String? {
+    val file = File(context.filesDir, CRASH_LOG_FILE)
+    if (!file.exists()) return null
+    val content = try {
+        file.readText()
+    } catch (e: Exception) {
+        null
+    }
+    file.delete()
+    return content
+}
+
+private fun openPdfViewer(context: android.content.Context, uri: Uri, title: String) {
+    val intent = Intent(context, PdfViewerActivity::class.java)
+    intent.putExtra(PdfViewerActivity.EXTRA_URI, uri)
+    intent.putExtra(PdfViewerActivity.EXTRA_TITLE, title)
+    context.startActivity(intent)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,9 +91,31 @@ fun AppRoot() {
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var downloadingUrl by remember { mutableStateOf<String?>(null) }
+    var crashLog by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(Unit) {
+        crashLog = readAndClearCrashLog(context)
+    }
+
+    // انتخاب یه فایل PDF مستقیم از حافظه‌ی گوشی برای خوندن (بدون نیاز به دانلود از سایت)
+    val pickLocalPdf = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                // بعضی منابع اجازه‌ی دائمی نمی‌دن؛ برای یه‌بار باز کردن مشکلی نیست
+            }
+            openPdfViewer(context, uri, "فایل محلی")
+        }
+    }
 
     suspend fun load() {
         loading = true
@@ -64,6 +136,31 @@ fun AppRoot() {
         else allPosts.filter {
             it.description.lowercase().contains(q) || it.fileName.lowercase().contains(q)
         }
+    }
+
+    crashLog?.let { log ->
+        AlertDialog(
+            onDismissRequest = { crashLog = null },
+            title = { Text("اپ دفعه‌ی قبل کرش کرده بود") },
+            text = {
+                Text(
+                    log.take(4000),
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("crash log", log))
+                    crashLog = null
+                }) { Text("کپی متن خطا") }
+            },
+            dismissButton = {
+                TextButton(onClick = { crashLog = null }) { Text("بستن") }
+            }
+        )
     }
 
     Scaffold(
@@ -106,6 +203,15 @@ fun AppRoot() {
                 }
             }
 
+            Spacer(Modifier.height(10.dp))
+
+            OutlinedButton(
+                onClick = { pickLocalPdf.launch(arrayOf("application/pdf")) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("📂 باز کردن فایل PDF از حافظه‌ی گوشی")
+            }
+
             Spacer(Modifier.height(12.dp))
 
             when {
@@ -134,10 +240,12 @@ fun AppRoot() {
                                         val fileName = post.fileName.ifBlank { "novel.pdf" }
                                         val dest = File(context.cacheDir, fileName)
                                         PostsRepository.downloadPdf(post.fileUrl, dest.absolutePath)
-                                        val intent = Intent(context, PdfViewerActivity::class.java)
-                                        intent.putExtra(PdfViewerActivity.EXTRA_PATH, dest.absolutePath)
-                                        intent.putExtra(PdfViewerActivity.EXTRA_TITLE, post.fileName)
-                                        context.startActivity(intent)
+                                        val fileUri = FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.fileprovider",
+                                            dest
+                                        )
+                                        openPdfViewer(context, fileUri, post.fileName)
                                     } catch (e: Exception) {
                                         error = e.message
                                     }
