@@ -7,7 +7,6 @@ plugins {
 android {
     namespace = "ir.romanism.reader"
     compileSdk = 36
-    compileSdkExtension = 19
 
     defaultConfig {
         applicationId = "ir.romanism.reader"
@@ -39,6 +38,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.android.material:material:1.13.0")
     implementation("org.json:json:20240303")
     debugImplementation("androidx.compose.ui:ui-tooling")
 

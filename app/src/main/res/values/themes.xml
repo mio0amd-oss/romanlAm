@@ -3,9 +3,31 @@
     <style name="Theme.RomanismReader" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:colorBackground">@color/background_dark</item>
         <item name="android:statusBarColor">@color/background_dark</item>
+        <item name="android:navigationBarColor">@color/background_dark</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="colorPrimary">@color/accent</item>
         <item name="colorPrimaryDark">@color/background_dark</item>
         <item name="colorAccent">@color/accent</item>
+
+        <!-- Explicit Material colors used by androidx.pdf's FloatingActionButton. -->
+        <item name="colorPrimaryContainer">@color/accent</item>
+        <item name="colorOnPrimaryContainer">@android:color/white</item>
+        <item name="colorSecondaryContainer">@color/surface_dark</item>
+        <item name="colorOnSecondaryContainer">@color/text_primary</item>
+
+        <!-- Give the PDF toolbox FAB a fully-resolved M2 style instead of relying
+             on a library/default theme attribute chain. -->
+        <item name="floatingActionButtonStyle">@style/Widget.RomanismReader.PdfFloatingActionButton</item>
+    </style>
+
+    <style name="Widget.RomanismReader.PdfFloatingActionButton" parent="Widget.MaterialComponents.FloatingActionButton">
+        <item name="backgroundTint">@color/accent</item>
+        <item name="rippleColor">@color/text_primary</item>
+        <item name="tint">@android:color/white</item>
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.RomanismReader.PdfFloatingActionButton</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.RomanismReader.PdfFloatingActionButton" parent="">
+        <item name="cornerSize">50%</item>
     </style>
 </resources>
