@@ -12,28 +12,41 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import ir.romanism.reader.model.Post
 import ir.romanism.reader.network.PostsRepository
-import ir.romanism.reader.pdf.PdfViewerActivity
 import ir.romanism.reader.pdf.PdfFileUtils
+import ir.romanism.reader.pdf.PdfViewerActivity
 import kotlinx.coroutines.launch
 import java.io.File
 
-private val TAGS = listOf("صحنه_دار", "عاشقانه", "درخواستی", "مافیایی")
 private const val CRASH_LOG_FILE = "crash_log.txt"
+private const val DONATION_URL = "https://daramet.com/Romanismm"
 
+/**
+ * صفحه اصلی: کارت‌های دو ستونه با عنوان و یک خط خلاصه.
+ *
+ * برای جلوگیری از نمایش مستقیم محتوای صریح، ورودی‌های دارای برچسب «صحنه‌دار»
+ * در این نمای عمومی فهرست نمی‌شوند.
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,19 +59,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * هر کرش غیرمنتظره‌ای تو کل اپ (هر اکتیویتی) رو می‌گیره و متن کاملش رو
- * تو یه فایل ذخیره می‌کنه، تا دفعه‌ی بعد که اپ باز شد نشونش بدیم —
- * دیگه لازم نیست از لاگ گیت‌هاب یا اسکرین‌شات برای پیدا کردن خطا استفاده کنیم.
- */
 private fun installCrashHandler(context: Context) {
     val appContext = context.applicationContext
     val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         try {
-            File(appContext.filesDir, CRASH_LOG_FILE).writeText(Log.getStackTraceString(throwable))
-        } catch (e: Exception) {
-            // اگه نوشتن فایل هم خطا داد، کاری از دستمون برنمیاد؛ بذار روند عادی کرش ادامه پیدا کنه
+            File(appContext.filesDir, CRASH_LOG_FILE)
+                .writeText(Log.getStackTraceString(throwable))
+        } catch (_: Exception) {
         }
         previousHandler?.uncaughtException(thread, throwable)
     }
@@ -67,20 +75,47 @@ private fun installCrashHandler(context: Context) {
 private fun readAndClearCrashLog(context: Context): String? {
     val file = File(context.filesDir, CRASH_LOG_FILE)
     if (!file.exists()) return null
-    val content = try {
-        file.readText()
-    } catch (e: Exception) {
-        null
-    }
+    val content = try { file.readText() } catch (_: Exception) { null }
     file.delete()
     return content
 }
 
-private fun openPdfViewer(context: android.content.Context, uri: Uri, title: String) {
-    val intent = Intent(context, PdfViewerActivity::class.java)
-    intent.putExtra(PdfViewerActivity.EXTRA_URI, uri)
-    intent.putExtra(PdfViewerActivity.EXTRA_TITLE, title)
+private fun openPdfViewer(context: Context, uri: Uri, title: String) {
+    val intent = Intent(context, PdfViewerActivity::class.java).apply {
+        putExtra(PdfViewerActivity.EXTRA_URI, uri)
+        putExtra(PdfViewerActivity.EXTRA_TITLE, title)
+    }
     context.startActivity(intent)
+}
+
+private fun openDonationPage(context: Context) {
+    val uri = Uri.parse(DONATION_URL)
+
+    // Prefer Chrome when installed; otherwise use the user's default browser.
+    val chromeIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+        setPackage("com.android.chrome")
+    }
+
+    try {
+        context.startActivity(chromeIntent)
+    } catch (_: Exception) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    }
+}
+
+private fun safeTitle(fileName: String): String {
+    return fileName
+        .substringBeforeLast('.', fileName)
+        .replace("_", " ")
+        .trim()
+        .ifBlank { "رمان" }
+}
+
+private fun isExplicitPost(post: Post): Boolean {
+    val text = "${post.fileName} ${post.description}".lowercase()
+    return text.contains("صحنه_دار") ||
+        text.contains("صحنه‌دار") ||
+        text.contains("صحنه دار")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,52 +123,58 @@ private fun openPdfViewer(context: android.content.Context, uri: Uri, title: Str
 fun AppRoot() {
     var allPosts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var query by remember { mutableStateOf("") }
-    var activeTag by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var downloadingUrl by remember { mutableStateOf<String?>(null) }
     var crashLog by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         crashLog = readAndClearCrashLog(context)
     }
 
-    // انتخاب PDF یا فایل BIN. اگر BIN واقعاً حاوی PDF باشد، بدون تغییر محتوا
-    // با پسوند .pdf در cache ذخیره و با PDF Viewer باز می‌شود.
     val pickLocalPdf = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+        if (uri == null) return@rememberLauncherForActivityResult
+
+        try {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (_: Exception) {
+        }
+
+        try {
+            val name = context.contentResolver.query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            } ?: "document.pdf"
+
+            if (name.lowercase().endsWith(".bin")) {
+                val pdfUri = PdfFileUtils.copyAsPdf(context, uri, name)
+                openPdfViewer(
+                    context,
+                    pdfUri,
+                    name.substringBeforeLast('.') + ".pdf"
                 )
-            } catch (e: Exception) {
-                // بعضی منابع اجازه‌ی دائمی نمی‌دن؛ برای یه‌بار باز کردن مشکلی نیست
+            } else {
+                openPdfViewer(context, uri, name)
             }
-
-            try {
-                val name = context.contentResolver.query(
-                    uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) cursor.getString(0) else null
-                } ?: "document.pdf"
-
-                if (name.lowercase().endsWith(".bin")) {
-                    val pdfUri = PdfFileUtils.copyAsPdf(context, uri, name)
-                    openPdfViewer(context, pdfUri, name.substringBeforeLast('.') + ".pdf")
-                } else {
-                    openPdfViewer(context, uri, name)
-                }
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(
-                    context, e.message ?: "فایل قابل باز کردن نیست", android.widget.Toast.LENGTH_LONG
-                ).show()
-            }
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(
+                context,
+                e.message ?: "فایل قابل باز کردن نیست",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -150,11 +191,16 @@ fun AppRoot() {
 
     LaunchedEffect(Unit) { load() }
 
-    val filtered = remember(allPosts, query) {
+    val visiblePosts = remember(allPosts) {
+        allPosts.filterNot(::isExplicitPost)
+    }
+
+    val filtered = remember(visiblePosts, query) {
         val q = query.trim().lowercase()
-        if (q.isEmpty()) allPosts
-        else allPosts.filter {
-            it.description.lowercase().contains(q) || it.fileName.lowercase().contains(q)
+        if (q.isEmpty()) visiblePosts
+        else visiblePosts.filter {
+            it.description.lowercase().contains(q) ||
+                it.fileName.lowercase().contains(q)
         }
     }
 
@@ -172,84 +218,118 @@ fun AppRoot() {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val cm = context.getSystemService(
+                        Context.CLIPBOARD_SERVICE
+                    ) as ClipboardManager
                     cm.setPrimaryClip(ClipData.newPlainText("crash log", log))
                     crashLog = null
-                }) { Text("کپی متن خطا") }
+                }) {
+                    Text("کپی متن خطا")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { crashLog = null }) { Text("بستن") }
+                TextButton(onClick = { crashLog = null }) {
+                    Text("بستن")
+                }
             }
         )
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("رمانیسم") }) }
+        topBar = {
+            TopAppBar(
+                title = { Text("رمانیسم") },
+                actions = {
+                    IconButton(onClick = {
+                        pickLocalPdf.launch(
+                            arrayOf(
+                                "application/pdf",
+                                "application/octet-stream",
+                                "*/*"
+                            )
+                        )
+                    }) {
+                        Icon(
+                            imageVector = Icons.Outlined.FolderOpen,
+                            contentDescription = "باز کردن فایل"
+                        )
+                    }
+
+                    IconButton(onClick = { openDonationPage(context) }) {
+                        Text(
+                            text = "💰",
+                            fontSize = 21.sp
+                        )
+                    }
+                }
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(12.dp)
                 .fillMaxSize()
+                .padding(horizontal = 12.dp)
         ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = {
-                    query = it
-                    activeTag = TAGS.firstOrNull { t -> t == it.trim() }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("جستجو در توضیحات یا اسم فایل...") },
-                singleLine = true
-            )
-
             Spacer(Modifier.height(8.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TAGS.forEach { tag ->
-                    FilterChip(
-                        selected = activeTag == tag,
-                        onClick = {
-                            if (activeTag == tag) {
-                                activeTag = null
-                                query = ""
-                            } else {
-                                activeTag = tag
-                                query = tag
-                            }
-                        },
-                        label = { Text(tag.replace("_", "‌")) }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            OutlinedButton(
-                onClick = { pickLocalPdf.launch(arrayOf("application/pdf", "application/octet-stream", "*/*")) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("📂 باز کردن فایل PDF از حافظه‌ی گوشی")
-            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("جستجوی رمان...") },
+                singleLine = true
+            )
 
             Spacer(Modifier.height(12.dp))
 
             when {
-                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                loading -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     CircularProgressIndicator()
                 }
-                error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+
+                error != null -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(error ?: "", textAlign = TextAlign.Center)
                         Spacer(Modifier.height(8.dp))
-                        Button(onClick = { scope.launch { load() } }) { Text("تلاش دوباره") }
+                        Button(onClick = { scope.launch { load() } }) {
+                            Text("تلاش دوباره")
+                        }
                     }
                 }
-                filtered.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("چیزی پیدا نشد.")
+
+                filtered.isEmpty() -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("رمانی پیدا نشد.")
                 }
-                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(filtered) { post ->
+
+                else -> LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = "رمان‌ها",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
+                        )
+                    }
+
+                    items(
+                        items = filtered,
+                        key = { "${it.fileName}|${it.fileUrl}" }
+                    ) { post ->
                         PostCard(
                             post = post,
                             isDownloading = downloadingUrl == post.fileUrl,
@@ -257,15 +337,29 @@ fun AppRoot() {
                                 scope.launch {
                                     downloadingUrl = post.fileUrl
                                     try {
-                                        val fileName = post.fileName.ifBlank { "novel.pdf" }
-                                        val dest = File(context.cacheDir, fileName)
-                                        PostsRepository.downloadPdf(post.fileUrl, dest.absolutePath)
-                                        val pdfFile = PdfFileUtils.normalizeDownloadedFile(dest)
-                                        val fileUri = FileProvider.getUriForFile(
-                                            context,
-                                            "${context.packageName}.fileprovider",
-                                            pdfFile
+                                        val fileName = post.fileName.ifBlank {
+                                            "novel.pdf"
+                                        }
+                                        val dest = File(
+                                            context.cacheDir,
+                                            fileName
                                         )
+
+                                        PostsRepository.downloadPdf(
+                                            post.fileUrl,
+                                            dest.absolutePath
+                                        )
+
+                                        val pdfFile =
+                                            PdfFileUtils.normalizeDownloadedFile(dest)
+
+                                        val fileUri =
+                                            FileProvider.getUriForFile(
+                                                context,
+                                                "${context.packageName}.fileprovider",
+                                                pdfFile
+                                            )
+
                                         openPdfViewer(
                                             context,
                                             fileUri,
@@ -286,24 +380,53 @@ fun AppRoot() {
 }
 
 @Composable
-fun PostCard(post: Post, isDownloading: Boolean, onOpen: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp)) {
-            if (post.fileName.isNotBlank()) {
-                Text(post.fileName, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
-            }
-            if (post.description.isNotBlank()) {
-                Text(post.description, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(8.dp))
-            }
-            Button(onClick = onOpen, enabled = !isDownloading) {
+fun PostCard(
+    post: Post,
+    isDownloading: Boolean,
+    onOpen: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 150.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = safeTitle(post.fileName),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = post.description.ifBlank { "برای مطالعه کلیک کنید." },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(Modifier.weight(1f))
+
+            Button(
+                onClick = onOpen,
+                enabled = !isDownloading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 if (isDownloading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("در حال دانلود...")
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("در حال دانلود…")
                 } else {
-                    Text("دانلود و مطالعه")
+                    Text("مطالعه")
                 }
             }
         }
