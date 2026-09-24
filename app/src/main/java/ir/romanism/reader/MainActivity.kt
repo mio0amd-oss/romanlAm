@@ -27,6 +27,7 @@ import androidx.core.content.FileProvider
 import ir.romanism.reader.model.Post
 import ir.romanism.reader.network.PostsRepository
 import ir.romanism.reader.pdf.PdfViewerActivity
+import ir.romanism.reader.pdf.PdfFileUtils
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -100,7 +101,8 @@ fun AppRoot() {
         crashLog = readAndClearCrashLog(context)
     }
 
-    // انتخاب یه فایل PDF مستقیم از حافظه‌ی گوشی برای خوندن (بدون نیاز به دانلود از سایت)
+    // انتخاب PDF یا فایل BIN. اگر BIN واقعاً حاوی PDF باشد، بدون تغییر محتوا
+    // با پسوند .pdf در cache ذخیره و با PDF Viewer باز می‌شود.
     val pickLocalPdf = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -113,7 +115,25 @@ fun AppRoot() {
             } catch (e: Exception) {
                 // بعضی منابع اجازه‌ی دائمی نمی‌دن؛ برای یه‌بار باز کردن مشکلی نیست
             }
-            openPdfViewer(context, uri, "فایل محلی")
+
+            try {
+                val name = context.contentResolver.query(
+                    uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                } ?: "document.pdf"
+
+                if (name.lowercase().endsWith(".bin")) {
+                    val pdfUri = PdfFileUtils.copyAsPdf(context, uri, name)
+                    openPdfViewer(context, pdfUri, name.substringBeforeLast('.') + ".pdf")
+                } else {
+                    openPdfViewer(context, uri, name)
+                }
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    context, e.message ?: "فایل قابل باز کردن نیست", android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
@@ -206,7 +226,7 @@ fun AppRoot() {
             Spacer(Modifier.height(10.dp))
 
             OutlinedButton(
-                onClick = { pickLocalPdf.launch(arrayOf("application/pdf")) },
+                onClick = { pickLocalPdf.launch(arrayOf("application/pdf", "application/octet-stream", "*/*")) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("📂 باز کردن فایل PDF از حافظه‌ی گوشی")
@@ -240,12 +260,17 @@ fun AppRoot() {
                                         val fileName = post.fileName.ifBlank { "novel.pdf" }
                                         val dest = File(context.cacheDir, fileName)
                                         PostsRepository.downloadPdf(post.fileUrl, dest.absolutePath)
+                                        val pdfFile = PdfFileUtils.normalizeDownloadedFile(dest)
                                         val fileUri = FileProvider.getUriForFile(
                                             context,
                                             "${context.packageName}.fileprovider",
-                                            dest
+                                            pdfFile
                                         )
-                                        openPdfViewer(context, fileUri, post.fileName)
+                                        openPdfViewer(
+                                            context,
+                                            fileUri,
+                                            pdfFile.name
+                                        )
                                     } catch (e: Exception) {
                                         error = e.message
                                     }
