@@ -3,8 +3,6 @@ package ir.romanism.reader.pdf
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
@@ -45,24 +43,39 @@ class PdfViewerActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tvTitle).text = title
         findViewById<ImageButton>(R.id.btnBack).setOnClickListener { finish() }
         findViewById<ImageButton>(R.id.btnSearch).setOnClickListener {
-            viewer?.isTextSearchActive = true
+            try {
+                viewer?.isTextSearchActive = true
+            } catch (e: Exception) {
+                toast("جست‌وجو در دسترس نیست: ${e.message}")
+            }
         }
         findViewById<ImageButton>(R.id.btnShare).setOnClickListener { shareCurrent() }
 
-        val fragment = PdfViewerFragment()
-        viewer = fragment
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.pdfContainer, fragment, "pdf_viewer")
-            .commit()
+        try {
+            val file = File(path)
+            if (!file.exists() || file.length() == 0L) {
+                toast("فایل دانلود نشده یا خرابه")
+                finish()
+                return
+            }
 
-        val file = File(path)
-        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-        documentUri = uri
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            documentUri = uri
 
-        // فرگمنت باید کامل attach بشه تا setDocumentUri جواب بده
-        Handler(Looper.getMainLooper()).postDelayed({
+            val fragment = PdfViewerFragment()
+            viewer = fragment
+            // commitNow به‌جای commit: تراکنش رو فوری و همزمان اجرا می‌کنه،
+            // پس فرگمنت تضمینی attach شده و دیگه نیازی به تأخیر مصنوعی (postDelayed) نیست
+            // که منبع کرش‌های تصادفی بود.
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.pdfContainer, fragment, "pdf_viewer")
+                .commitNow()
+
             fragment.documentUri = uri
-        }, 150)
+        } catch (e: Exception) {
+            toast("خطا در باز کردن PDF: ${e.message}")
+            e.printStackTrace()
+        }
     }
 
     private fun shareCurrent() {
@@ -71,12 +84,16 @@ class PdfViewerActivity : AppCompatActivity() {
             toast("فایل هنوز آماده نیست")
             return
         }
-        val send = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(send, "اشتراک‌گذاری PDF"))
+        } catch (e: Exception) {
+            toast("اشتراک‌گذاری ممکن نشد: ${e.message}")
         }
-        startActivity(Intent.createChooser(send, "اشتراک‌گذاری PDF"))
     }
 
     private fun toast(msg: String) {

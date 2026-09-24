@@ -1,23 +1,36 @@
-romanism.ir
+# رمانیسم ریدر (RomanismReader)
 
-تب
-@Xinaler
-پشتیبانی
-https://splus.ir/Haner_sir
-چنل اول
-https://splus.ir/romanismm
-چنل دوم🃏
-https://splus.ir/Romanismm_2
-گروه
-https://splus.ir/Romanismm_chat
-ناشناس
-https://eitaayar.ir/anonymous/Gx0n.b15yvi
-اموزش
-https://splus.ir/joingroup/AWjBXdZV3GqUI-zKWdNShg
-جواب ناشناس
-https://splus.ir/RoManism_NES
-وبسایت ها
-https://nnjkhk.dpdns.org
-Romanism.ir
-چنل تلگرام
-https://t.me/romanismm
+![Build Status](https://github.com/mio0amd-oss/romanIAm/actions/workflows/build.yml/badge.svg)
+
+اپلیکیشن اندروید ساده برای مشاهده و دانلود رمان‌های romanism.ir.
+
+## قابلیت‌ها
+- خوندن لیست رمان‌ها از همون `posts.json` که سایت ازش استفاده می‌کنه
+- جستجوی متنی + همون ۴ تگ سایت (صحنه‌دار، عاشقانه، درخواستی، مافیایی)
+- دانلود فایل PDF و باز کردنش داخل خود اپ با کتابخونه‌ی رسمی جتپک **androidx.pdf (نسخه‌ی beta)**: زوم/اسکرول روان، جست‌وجوی متن، انتخاب/کپی متن، و اشتراک‌گذاری فایل
+
+## راه‌اندازی (روی کامپیوتر خودت، با Android Studio)
+1. Android Studio (نسخه‌ی اخیر، مثلاً Koala یا بالاتر) رو نصب کن
+2. این پوشه رو با گزینه‌ی **Open** توی Android Studio باز کن (نه Import)
+3. صبر کن Gradle Sync تموم بشه (نیاز به اینترنت داره تا کتابخونه‌ها دانلود بشن)
+4. یه شبیه‌ساز (Emulator) بساز یا گوشی واقعی رو با USB Debugging وصل کن
+5. دکمه‌ی Run (▶️) رو بزن
+
+## ساخت APK آنلاین (بدون نصب هیچی روی کامپیوتر)
+این پروژه یه فایل GitHub Actions (`.github/workflows/build.yml`) داره که خودش APK رو تو ابر می‌سازه:
+
+1. یه ریپوی جدید تو گیت‌هاب بساز (یا از همون اکانتی که برای بقیه‌ی پروژه‌هات استفاده می‌کنی)
+2. کل محتوای این پوشه (RomanismReader) رو توش آپلود/پوش کن — از همون رابط وب گیت‌هاب هم می‌شه (Add file → Upload files)، لازم نیست از خط فرمان استفاده کنی
+3. برو تب **Actions** بالای صفحه‌ی ریپو — یه ورک‌فلو به اسم "Build Android APK" باید خودش اجرا بشه (چند دقیقه طول می‌کشه)
+4. وقتی سبز شد و تموم شد، روی همون اجرا کلیک کن، پایین صفحه بخش **Artifacts** رو ببین، فایل `RomanismReader-debug-apk` رو دانلود کن
+5. زیپش رو باز کن — یه فایل `app-debug.apk` توشه، همونو به گوشیت منتقل کن و نصبش کن (ممکنه لازم باشه تو تنظیمات گوشی "نصب از منابع ناشناس" رو موقتاً فعال کنی)
+
+## اگه posts.json عوض شد
+آدرسش رو توی این فایل عوض کن:
+`app/src/main/java/ir/romanism/reader/network/PostsRepository.kt`
+خط `POSTS_URL`
+
+## محدودیت‌های فعلی (برای توسعه‌ی بعدی)
+- فایل‌های خیلی حجیم (چند صد صفحه) ممکنه موقع رندر کل PDF کند بشن؛ می‌شه صفحه‌ها رو تنبل (lazy) رندر کرد
+- آیکون اپ پیش‌فرض اندروید استوده؛ بعداً می‌شه لوگوی سایت رو گذاشت
+- برای انتشار روی گوشی‌های دیگه، باید APK رو Build → Generate Signed APK بگیری
