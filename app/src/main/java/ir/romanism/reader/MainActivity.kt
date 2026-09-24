@@ -192,8 +192,6 @@ fun AppRoot() {
 
     LaunchedEffect(Unit) { load() }
 
-    val visiblePosts = remember(allPosts) {
-        allPosts.filterNot(::isExplicitPost)
     }
 
     val filtered = remember(visiblePosts, query) {
