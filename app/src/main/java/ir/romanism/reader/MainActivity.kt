@@ -126,6 +126,7 @@ fun AppRoot() {
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var downloadingUrl by remember { mutableStateOf<String?>(null) }
+    var selectedPost by remember { mutableStateOf<Post?>(null) }
     var crashLog by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
@@ -202,6 +203,34 @@ fun AppRoot() {
             it.description.lowercase().contains(q) ||
                 it.fileName.lowercase().contains(q)
         }
+    }
+
+    selectedPost?.let { post ->
+        AlertDialog(
+            onDismissRequest = { selectedPost = null },
+            title = {
+                Text(
+                    text = safeTitle(post.fileName),
+                    textAlign = TextAlign.Right,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            text = {
+                Text(
+                    text = post.description.ifBlank { "متنی برای این مورد ثبت نشده است." },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    textAlign = TextAlign.Right,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedPost = null }) {
+                    Text("بستن")
+                }
+            }
+        )
     }
 
     crashLog?.let { log ->
@@ -333,6 +362,7 @@ fun AppRoot() {
                         PostCard(
                             post = post,
                             isDownloading = downloadingUrl == post.fileUrl,
+                            onShowSummary = { selectedPost = post },
                             onOpen = {
                                 scope.launch {
                                     downloadingUrl = post.fileUrl
@@ -383,9 +413,11 @@ fun AppRoot() {
 fun PostCard(
     post: Post,
     isDownloading: Boolean,
+    onShowSummary: () -> Unit,
     onOpen: () -> Unit
 ) {
     ElevatedCard(
+        onClick = onShowSummary,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 150.dp)
