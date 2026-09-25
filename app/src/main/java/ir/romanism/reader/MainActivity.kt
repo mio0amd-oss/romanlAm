@@ -111,6 +111,13 @@ private fun safeTitle(fileName: String): String {
         .ifBlank { "رمان" }
 }
 
+private fun isExplicitPost(post: Post): Boolean {
+    val text = "${post.fileName} ${post.description}".lowercase()
+    return text.contains("صحنه_دار") ||
+        text.contains("صحنه‌دار") ||
+        text.contains("صحنه دار")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppRoot() {
@@ -185,10 +192,14 @@ fun AppRoot() {
 
     LaunchedEffect(Unit) { load() }
 
-    val filtered = remember(allPosts, query) {
+    val visiblePosts = remember(allPosts) {
+        allPosts.filterNot(::isExplicitPost)
+    }
+
+    val filtered = remember(visiblePosts, query) {
         val q = query.trim().lowercase()
-        if (q.isEmpty()) allPosts
-        else allPosts.filter {
+        if (q.isEmpty()) visiblePosts
+        else visiblePosts.filter {
             it.description.lowercase().contains(q) ||
                 it.fileName.lowercase().contains(q)
         }
@@ -398,7 +409,6 @@ fun AppRoot() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostCard(
     post: Post,
