@@ -2,63 +2,53 @@ package ir.romanism.reader.pdf
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.content.FileProvider
 import java.io.File
+import java.io.IOException
 
 /**
- * فایل‌های PDF که بعضی سرورها با پسوند .bin می‌فرستند را هم پشتیبانی می‌کند.
- * اگر محتوای فایل واقعاً PDF باشد، فقط نام/مسیر آن به .pdf تبدیل می‌شود؛
- * هیچ تبدیل باینریِ دیگری لازم نیست و داده‌ها بدون تغییر باقی می‌مانند.
+ * چون بعضی سرورها/فایل‌های محلی پسوند اشتباه (مثل .bin به‌جای .pdf) دارن،
+ * این کلاس مطمئن می‌شه فایلی که به ریدر PDF می‌رسه همیشه اسم/پسوند درست داره.
  */
 object PdfFileUtils {
 
-    private const val PDF_HEADER = "%PDF-"
+    /**
+     * فایل دانلودشده از سایت رو، اگه اسمش پسوند pdf. نداشته باشه، به یه فایل
+     * هم‌نام با پسوند .pdf تبدیل می‌کنه (rename، یا در صورت شکست، کپی).
+     */
+    fun normalizeDownloadedFile(file: File): File {
+        if (file.name.lowercase().endsWith(".pdf")) return file
 
-    fun isPdfContent(file: File): Boolean {
-        if (!file.exists() || file.length() < PDF_HEADER.length) return false
-        return file.inputStream().use { input ->
-            val header = ByteArray(PDF_HEADER.length)
-            val read = input.read(header)
-            read == header.size && String(header, Charsets.US_ASCII) == PDF_HEADER
-        }
+        val newName = file.nameWithoutExtension + ".pdf"
+        val renamed = File(file.parentFile, newName)
+        if (file.renameTo(renamed)) return renamed
+
+        file.copyTo(renamed, overwrite = true)
+        return renamed
     }
 
-    fun copyAsPdf(context: Context, source: Uri, displayName: String): Uri {
-        val safeName = displayName.ifBlank { "document.pdf" }
-        val pdfName = safeName.substringBeforeLast('.', safeName) + ".pdf"
-        val dest = File(context.cacheDir, "pdf_${System.currentTimeMillis()}_$pdfName")
+    /**
+     * فایلی که از انتخابگر سیستم (Storage Access Framework) اومده رو، حتی اگه
+     * اسم اصلیش پسوند pdf نداشته باشه، توی حافظه‌ی موقت اپ با اسم درست کپی
+     * می‌کنه و یه content Uri قابل‌استفاده برای ریدر برمی‌گردونه.
+     */
+    fun copyAsPdf(context: Context, source: Uri, originalName: String): Uri {
+        val baseName = originalName.substringBeforeLast('.', originalName).ifBlank { "document" }
+        val destFile = File(context.cacheDir, "$baseName.pdf")
 
-        context.contentResolver.openInputStream(source).use { input ->
-            requireNotNull(input) { "امکان خواندن فایل وجود ندارد" }
-            dest.outputStream().use { output -> input.copyTo(output) }
+        val input = context.contentResolver.openInputStream(source)
+            ?: throw IOException("امکان خواندن فایل انتخاب‌شده نبود")
+
+        input.use { inStream ->
+            destFile.outputStream().use { outStream ->
+                inStream.copyTo(outStream)
+            }
         }
 
-        if (!isPdfContent(dest)) {
-            dest.delete()
-            throw IllegalArgumentException("این فایل BIN در واقع PDF نیست و امکان تبدیل خودکار آن وجود ندارد")
-        }
-
-        return androidx.core.content.FileProvider.getUriForFile(
+        return FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
-            dest
+            destFile
         )
-    }
-
-    fun normalizeDownloadedFile(file: File): File {
-        val lower = file.name.lowercase()
-        if (!lower.endsWith(".bin")) return file
-
-        if (!isPdfContent(file)) {
-            throw IllegalArgumentException("فایل BIN دانلودشده محتوای PDF ندارد")
-        }
-
-        val pdfName = file.nameWithoutExtension + ".pdf"
-        val pdfFile = File(file.parentFile, pdfName)
-        if (pdfFile.exists()) pdfFile.delete()
-        if (!file.renameTo(pdfFile)) {
-            file.copyTo(pdfFile, overwrite = true)
-            file.delete()
-        }
-        return pdfFile
     }
 }

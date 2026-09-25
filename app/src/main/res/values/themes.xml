@@ -3,80 +3,9 @@
     <style name="Theme.RomanismReader" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:colorBackground">@color/background_dark</item>
         <item name="android:statusBarColor">@color/background_dark</item>
-        <item name="android:navigationBarColor">@color/background_dark</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="colorPrimary">@color/accent</item>
         <item name="colorPrimaryDark">@color/background_dark</item>
         <item name="colorAccent">@color/accent</item>
-
-        <!-- Explicit Material colors used by androidx.pdf's FloatingActionButton. -->
-        <item name="colorPrimaryContainer">@color/accent</item>
-        <item name="colorOnPrimaryContainer">@android:color/white</item>
-        <item name="colorSecondaryContainer">@color/surface_dark</item>
-        <item name="colorOnSecondaryContainer">@color/text_primary</item>
-        <item name="colorSurface">@color/surface_dark</item>
-        <item name="colorOnSurface">@color/text_primary</item>
-        <item name="colorSurfaceVariant">@color/surface_dark</item>
-        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
-        <item name="colorOutline">@color/text_secondary</item>
-        <item name="colorOutlineVariant">@color/surface_dark</item>
-        <item name="colorError">#B3261E</item>
-        <item name="colorOnError">@android:color/white</item>
-
-        <!-- AndroidX PDF uses newer Material text-appearance theme attributes.
-             Keep them explicitly resolved while the application uses a
-             MaterialComponents/AppCompat XML theme. -->
-        <item name="textAppearanceBodyLarge">@style/TextAppearance.RomanismReader.BodyLarge</item>
-        <item name="textAppearanceBodyMedium">@style/TextAppearance.RomanismReader.BodyMedium</item>
-        <item name="textAppearanceBodySmall">@style/TextAppearance.RomanismReader.BodySmall</item>
-        <item name="textAppearanceLabelLarge">@style/TextAppearance.RomanismReader.LabelLarge</item>
-        <item name="textAppearanceLabelMedium">@style/TextAppearance.RomanismReader.LabelMedium</item>
-        <item name="textAppearanceLabelSmall">@style/TextAppearance.RomanismReader.LabelSmall</item>
-        <item name="textAppearanceTitleLarge">@style/TextAppearance.RomanismReader.TitleLarge</item>
-        <item name="textAppearanceTitleMedium">@style/TextAppearance.RomanismReader.TitleMedium</item>
-        <item name="textAppearanceTitleSmall">@style/TextAppearance.RomanismReader.TitleSmall</item>
-
-        <!-- Give the PDF toolbox FAB a fully-resolved M2 style instead of relying
-             on a library/default theme attribute chain. -->
-        <item name="floatingActionButtonStyle">@style/Widget.RomanismReader.PdfFloatingActionButton</item>
-    </style>
-
-    <style name="TextAppearance.RomanismReader.BodyLarge" parent="TextAppearance.MaterialComponents.Body1">
-        <item name="android:textColor">@color/text_primary</item>
-    </style>
-    <style name="TextAppearance.RomanismReader.BodyMedium" parent="TextAppearance.MaterialComponents.Body2">
-        <item name="android:textColor">@color/text_primary</item>
-    </style>
-    <style name="TextAppearance.RomanismReader.BodySmall" parent="TextAppearance.MaterialComponents.Caption">
-        <item name="android:textColor">@color/text_secondary</item>
-    </style>
-    <style name="TextAppearance.RomanismReader.LabelLarge" parent="TextAppearance.MaterialComponents.Button">
-        <item name="android:textColor">@color/text_primary</item>
-    </style>
-    <style name="TextAppearance.RomanismReader.LabelMedium" parent="TextAppearance.MaterialComponents.Caption">
-        <item name="android:textColor">@color/text_primary</item>
-    </style>
-    <style name="TextAppearance.RomanismReader.LabelSmall" parent="TextAppearance.MaterialComponents.Caption">
-        <item name="android:textColor">@color/text_secondary</item>
-    </style>
-    <style name="TextAppearance.RomanismReader.TitleLarge" parent="TextAppearance.MaterialComponents.Headline6">
-        <item name="android:textColor">@color/text_primary</item>
-    </style>
-    <style name="TextAppearance.RomanismReader.TitleMedium" parent="TextAppearance.MaterialComponents.Subtitle1">
-        <item name="android:textColor">@color/text_primary</item>
-    </style>
-    <style name="TextAppearance.RomanismReader.TitleSmall" parent="TextAppearance.MaterialComponents.Subtitle2">
-        <item name="android:textColor">@color/text_primary</item>
-    </style>
-
-    <style name="Widget.RomanismReader.PdfFloatingActionButton" parent="Widget.MaterialComponents.FloatingActionButton">
-        <item name="backgroundTint">@color/accent</item>
-        <item name="rippleColor">@color/text_primary</item>
-        <item name="tint">@android:color/white</item>
-        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.RomanismReader.PdfFloatingActionButton</item>
-    </style>
-
-    <style name="ShapeAppearanceOverlay.RomanismReader.PdfFloatingActionButton" parent="">
-        <item name="cornerSize">50%</item>
     </style>
 </resources>

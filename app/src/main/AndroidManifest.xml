@@ -32,39 +32,7 @@
 
         <activity
             android:name=".pdf.PdfViewerActivity"
-            android:exported="true">
-
-            <!-- Allow Android file managers and other apps to open PDF files with Romanism Reader. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/pdf" />
-            </intent-filter>
-
-            <!-- .bin files are commonly reported as application/octet-stream. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/octet-stream" />
-            </intent-filter>
-
-            <!-- Some file providers use these less-common binary MIME types. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/x-binary" />
-            </intent-filter>
-
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/x-bin" />
-            </intent-filter>
-        </activity>
+            android:exported="false" />
 
     </application>
 

@@ -398,6 +398,7 @@ fun AppRoot() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PostCard(
     post: Post,
