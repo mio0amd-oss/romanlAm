@@ -12,14 +12,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,22 +33,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import ir.romanism.reader.model.Post
 import ir.romanism.reader.network.PostsRepository
 import ir.romanism.reader.pdf.PdfFileUtils
 import ir.romanism.reader.pdf.PdfViewerActivity
 import kotlinx.coroutines.launch
 import java.io.File
+import java.security.MessageDigest
 
 private const val CRASH_LOG_FILE = "crash_log.txt"
 private const val DONATION_URL = "https://daramet.com/Romanismm"
 
-/**
- * صفحه اصلی: کارت‌های دو ستونه با عنوان و یک خط خلاصه.
- *
- * برای جلوگیری از نمایش مستقیم محتوای صریح، ورودی‌های دارای برچسب «صحنه‌دار»
- * در این نمای عمومی فهرست نمی‌شوند.
- */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,13 +62,13 @@ class MainActivity : ComponentActivity() {
 private fun installCrashHandler(context: Context) {
     val appContext = context.applicationContext
     val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
-    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+    Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
         try {
             File(appContext.filesDir, CRASH_LOG_FILE)
                 .writeText(Log.getStackTraceString(throwable))
         } catch (_: Exception) {
         }
-        previousHandler?.uncaughtException(thread, throwable)
+        previousHandler?.uncaughtException(Thread.currentThread(), throwable)
     }
 }
 
@@ -90,12 +90,9 @@ private fun openPdfViewer(context: Context, uri: Uri, title: String) {
 
 private fun openDonationPage(context: Context) {
     val uri = Uri.parse(DONATION_URL)
-
-    // Prefer Chrome when installed; otherwise use the user's default browser.
     val chromeIntent = Intent(Intent.ACTION_VIEW, uri).apply {
         setPackage("com.android.chrome")
     }
-
     try {
         context.startActivity(chromeIntent)
     } catch (_: Exception) {
@@ -111,12 +108,42 @@ private fun safeTitle(fileName: String): String {
         .ifBlank { "رمان" }
 }
 
+private fun downloadDirectory(context: Context): File =
+    File(context.filesDir, "downloads").apply { mkdirs() }
+
+private fun urlHash(url: String): String {
+    val bytes = MessageDigest.getInstance("SHA-256")
+        .digest(url.toByteArray(Charsets.UTF_8))
+    return bytes.joinToString("") { "%02x".format(it) }.take(20)
+}
+
+private fun localFileFor(context: Context, post: Post): File {
+    val original = post.fileName.ifBlank { "novel.pdf" }
+    val clean = original.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+    return File(downloadDirectory(context), "${urlHash(post.fileUrl)}_$clean")
+}
+
+private fun findExistingLocalFile(context: Context, post: Post): File? {
+    val preferred = localFileFor(context, post)
+    if (preferred.exists() && preferred.length() > 0) return preferred
+
+    val base = preferred.name.substringBeforeLast('.', preferred.name)
+    val dir = downloadDirectory(context)
+    return dir.listFiles()?.firstOrNull {
+        it.name.startsWith("$base.") && it.length() > 0
+    }
+}
+
+private fun formatCount(count: Int): String = "$count رمان"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppRoot() {
     var allPosts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var query by remember { mutableStateOf("") }
+    var activeTag by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var downloadingUrl by remember { mutableStateOf<String?>(null) }
     var selectedPost by remember { mutableStateOf<Post?>(null) }
@@ -124,6 +151,7 @@ fun AppRoot() {
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(Unit) {
         crashLog = readAndClearCrashLog(context)
@@ -133,7 +161,6 @@ fun AppRoot() {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-
         try {
             context.contentResolver.takePersistableUriPermission(
                 uri,
@@ -155,11 +182,7 @@ fun AppRoot() {
 
             if (name.lowercase().endsWith(".bin")) {
                 val pdfUri = PdfFileUtils.copyAsPdf(context, uri, name)
-                openPdfViewer(
-                    context,
-                    pdfUri,
-                    name.substringBeforeLast('.') + ".pdf"
-                )
+                openPdfViewer(context, pdfUri, name.substringBeforeLast('.') + ".pdf")
             } else {
                 openPdfViewer(context, uri, name)
             }
@@ -172,25 +195,42 @@ fun AppRoot() {
         }
     }
 
-    suspend fun load() {
-        loading = true
+    suspend fun load(showSpinner: Boolean = true) {
+        if (showSpinner) loading = true
         error = null
+
         try {
-            allPosts = PostsRepository.fetchPosts()
+            val fresh = PostsRepository.fetchPosts(context)
+            allPosts = fresh
         } catch (e: Exception) {
-            error = e.message ?: "خطای ناشناخته"
+            val cached = PostsRepository.loadCachedPosts(context)
+            if (cached.isNotEmpty()) {
+                allPosts = cached
+                error = null
+            } else {
+                error = e.message ?: "خطای ناشناخته"
+            }
+        } finally {
+            loading = false
+            refreshing = false
         }
-        loading = false
     }
 
-    LaunchedEffect(Unit) { load() }
+    // هر بار برنامه دوباره به حالت فعال برگردد، فهرست تازه می‌شود.
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            load(showSpinner = allPosts.isEmpty())
+        }
+    }
 
-    val filtered = remember(allPosts, query) {
+    val filtered = remember(allPosts, query, activeTag) {
         val q = query.trim().lowercase()
-        if (q.isEmpty()) allPosts
-        else allPosts.filter {
-            it.description.lowercase().contains(q) ||
-                it.fileName.lowercase().contains(q)
+        val tag = activeTag?.lowercase()
+
+        allPosts.filter { post ->
+            val text = "${post.fileName} ${post.description}".lowercase()
+            (q.isEmpty() || text.contains(q)) &&
+                (tag == null || text.contains(tag))
         }
     }
 
@@ -236,9 +276,7 @@ fun AppRoot() {
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val cm = context.getSystemService(
-                        Context.CLIPBOARD_SERVICE
-                    ) as ClipboardManager
+                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     cm.setPrimaryClip(ClipData.newPlainText("crash log", log))
                     crashLog = null
                 }) {
@@ -258,26 +296,28 @@ fun AppRoot() {
             TopAppBar(
                 title = { Text("رمانیسم") },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                refreshing = true
+                                load(showSpinner = allPosts.isEmpty())
+                            }
+                        },
+                        enabled = !refreshing
+                    ) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = "به‌روزرسانی")
+                    }
+
                     IconButton(onClick = {
                         pickLocalPdf.launch(
-                            arrayOf(
-                                "application/pdf",
-                                "application/octet-stream",
-                                "*/*"
-                            )
+                            arrayOf("application/pdf", "application/octet-stream", "*/*")
                         )
                     }) {
-                        Icon(
-                            imageVector = Icons.Outlined.FolderOpen,
-                            contentDescription = "باز کردن فایل"
-                        )
+                        Icon(Icons.Outlined.FolderOpen, contentDescription = "باز کردن فایل")
                     }
 
                     IconButton(onClick = { openDonationPage(context) }) {
-                        Text(
-                            text = "💰",
-                            fontSize = 21.sp
-                        )
+                        Text("💰", fontSize = 21.sp)
                     }
                 }
             )
@@ -289,27 +329,77 @@ fun AppRoot() {
                 .fillMaxSize()
                 .padding(horizontal = 12.dp)
         ) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
 
             OutlinedTextField(
                 value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("جستجوی رمان...") },
-                singleLine = true
+                onValueChange = {
+                    query = it
+                    activeTag = null
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                placeholder = { Text("جستجو...", maxLines = 1) },
+                leadingIcon = {
+                    Icon(Icons.Outlined.Search, contentDescription = "جستجو")
+                },
+                trailingIcon = {
+                    Text(
+                        text = formatCount(filtered.size),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 10.dp)
+                    )
+                },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(7.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                listOf("عاشقانه", "مافیایی").forEach { tag ->
+                    FilterChip(
+                        selected = activeTag == tag,
+                        onClick = {
+                            activeTag = if (activeTag == tag) null else tag
+                            query = ""
+                        },
+                        label = { Text(tag, maxLines = 1) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(7.dp))
+
+            Text(
+                text = if (query.isBlank() && activeTag == null) {
+                    "مجموع: ${formatCount(allPosts.size)}"
+                } else {
+                    "نتیجه جستجو: ${formatCount(filtered.size)}"
+                },
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Right
+            )
+
+            Spacer(Modifier.height(5.dp))
 
             when {
-                loading -> Box(
+                loading && allPosts.isEmpty() -> Box(
                     Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }
 
-                error != null -> Box(
+                error != null && allPosts.isEmpty() -> Box(
                     Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
@@ -326,7 +416,7 @@ fun AppRoot() {
                     Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("رمانی پیدا نشد.")
+                    Text("رمانی مطابق جستجو پیدا نشد.")
                 }
 
                 else -> LazyVerticalGrid(
@@ -334,16 +424,8 @@ fun AppRoot() {
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
+                    contentPadding = PaddingValues(top = 3.dp, bottom = 16.dp)
                 ) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "رمان‌ها",
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
-                        )
-                    }
-
                     items(
                         items = filtered,
                         key = { "${it.fileName}|${it.fileUrl}" }
@@ -356,38 +438,26 @@ fun AppRoot() {
                                 scope.launch {
                                     downloadingUrl = post.fileUrl
                                     try {
-                                        val fileName = post.fileName.ifBlank {
-                                            "novel.pdf"
-                                        }
-                                        val dest = File(
-                                            context.cacheDir,
-                                            fileName
-                                        )
-
-                                        PostsRepository.downloadPdf(
-                                            post.fileUrl,
-                                            dest.absolutePath
-                                        )
-
-                                        val pdfFile =
+                                        val existing = findExistingLocalFile(context, post)
+                                        val pdfFile = if (existing != null) {
+                                            PdfFileUtils.normalizeDownloadedFile(existing)
+                                        } else {
+                                            val dest = localFileFor(context, post)
+                                            PostsRepository.downloadPdf(post.fileUrl, dest.absolutePath)
                                             PdfFileUtils.normalizeDownloadedFile(dest)
+                                        }
 
-                                        val fileUri =
-                                            FileProvider.getUriForFile(
-                                                context,
-                                                "${context.packageName}.fileprovider",
-                                                pdfFile
-                                            )
-
-                                        openPdfViewer(
+                                        val fileUri = FileProvider.getUriForFile(
                                             context,
-                                            fileUri,
-                                            pdfFile.name
+                                            "${context.packageName}.fileprovider",
+                                            pdfFile
                                         )
+                                        openPdfViewer(context, fileUri, pdfFile.name)
                                     } catch (e: Exception) {
                                         error = e.message
+                                    } finally {
+                                        downloadingUrl = null
                                     }
-                                    downloadingUrl = null
                                 }
                             }
                         )
@@ -445,7 +515,7 @@ fun PostCard(
                         strokeWidth = 2.dp
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text("در حال دانلود…")
+                    Text("در حال آماده‌سازی…")
                 } else {
                     Text("مطالعه")
                 }

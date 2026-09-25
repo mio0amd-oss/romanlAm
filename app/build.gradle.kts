@@ -13,8 +13,8 @@ android {
         applicationId = "ir.romanism.reader"
         minSdk = 28
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.1"
+        versionCode = 4
+        versionName = "1.2"
     }
 
     buildFeatures {
@@ -39,6 +39,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.android.material:material:1.13.0")
