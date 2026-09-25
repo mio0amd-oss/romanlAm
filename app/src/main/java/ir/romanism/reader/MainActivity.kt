@@ -354,7 +354,6 @@ fun AppRoot() {
                 },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
             )
 
             Spacer(Modifier.height(7.dp))
