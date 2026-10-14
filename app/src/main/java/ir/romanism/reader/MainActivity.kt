@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package ir.romanism.reader
 
 import android.content.ClipData
@@ -226,8 +228,7 @@ private fun shimmerBrush(): Brush {
     val progress by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing)),
-        label = "shimmerProgress"
+        animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing))
     )
     val base = PlumSurfaceHigh
     val span = 900f
@@ -676,8 +677,7 @@ private fun ReaderHeader(
     val angle by spin.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing)),
-        label = "refreshAngle"
+        animationSpec = infiniteRepeatable(tween(1100, easing = LinearEasing))
     )
 
     Row(
@@ -753,6 +753,7 @@ private fun ReaderHeader(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SearchField(
     query: String,
