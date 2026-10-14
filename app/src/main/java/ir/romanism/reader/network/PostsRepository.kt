@@ -8,31 +8,57 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import java.io.File
+import java.util.concurrent.TimeUnit
 
-private const val POSTS_URL = "https://raw.githubusercontent.com/binerri/chanel-files/main/posts.json"
 private const val CACHE_FILE = "posts_cache.json"
+
+/**
+ * منبع فهرست رمان‌ها:
+ * ۱) آدرس خود سایت romanism.ir (اگر posts.json را روی دامنه‌ی خودش بگذارد)
+ * ۲) همان آدرسی که خود سایت امروز از آن می‌خواند، تا اپ همیشه با سایت هم‌خوان بماند.
+ */
+private val POSTS_URLS = listOf(
+    "https://romanism.ir/posts.json",
+    "https://raw.githubusercontent.com/binerri/chanel-files/main/posts.json",
+)
 
 object PostsRepository {
 
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .callTimeout(25, TimeUnit.SECONDS)
+        .build()
 
     suspend fun fetchPosts(context: Context): List<Post> = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url(POSTS_URL)
-            .build()
+        var lastError: Exception? = null
 
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw Exception("خطا در دریافت اطلاعات: ${response.code}")
+        for (url in POSTS_URLS) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Cache-Control", "no-cache")
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        throw Exception("پاسخ ناموفق از $url: ${response.code}")
+                    }
+
+                    val body = response.body?.string() ?: "[]"
+
+                    // آخرین فهرست موفق را برای حالت آفلاین نگه می‌داریم.
+                    File(context.filesDir, CACHE_FILE).writeText(body)
+
+                    return@withContext parsePosts(body)
+                }
+            } catch (e: Exception) {
+                // سراغ منبع بعدی می‌رویم؛ مثلاً وقتی فایل هنوز روی دامنه‌ی سایت نگذاشته است.
+                lastError = e
             }
-
-            val body = response.body?.string() ?: "[]"
-
-            // آخرین فهرست موفق را برای حالت آفلاین نگه می‌داریم.
-            File(context.filesDir, CACHE_FILE).writeText(body)
-
-            parsePosts(body)
         }
+
+        throw lastError ?: Exception("خطا در دریافت اطلاعات")
     }
 
     fun loadCachedPosts(context: Context): List<Post> {

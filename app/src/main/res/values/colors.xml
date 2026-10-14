@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background_dark">#0d0f14</color>
-    <color name="surface_dark">#1a1d24</color>
-    <color name="accent">#2563eb</color>
-    <color name="text_primary">#e6e6e6</color>
-    <color name="text_secondary">#9aa0a6</color>
+
+    <!-- هسته‌ی رنگ: شب‌رنگ ارغوانی با لهجه‌ی گل‌سرخ و طلایی -->
+    <color name="background_dark">#FF0A0810</color>
+    <color name="surface_dark">#FF14101D</color>
+    <color name="surface_variant">#FF1E1830</color>
+    <color name="surface_high">#FF2A2140</color>
+    <color name="accent">#FFFF4D7E</color>
+    <color name="accent_deep">#FFB3124F</color>
+    <color name="accent_soft">#FFFFD9E2</color>
+    <color name="gold">#FFE8B44F</color>
+    <color name="text_primary">#FFF4EEF5</color>
+    <color name="text_secondary">#FFA89FB4</color>
+    <color name="outline">#FF3A3049</color>
+    <color name="night_overlay_soft">#59000000</color>
+    <color name="night_overlay_strong">#8C000000</color>
+    <color name="reader_background">#FF07050C</color>
+
 </resources>
