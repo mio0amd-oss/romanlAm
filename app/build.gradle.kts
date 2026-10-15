@@ -17,6 +17,10 @@ android {
         versionName = "1.3"
     }
 
+    packagingOptions {
+        doNotStrip("*/*")
+    }
+
     buildFeatures {
         compose = true
     }
@@ -27,6 +31,10 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+tasks.named("stripDebugDebugSymbols") {
+    enabled = false
 }
 
 dependencies {
