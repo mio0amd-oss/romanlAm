@@ -17,8 +17,10 @@ android {
         versionName = "1.3"
     }
 
-    packagingOptions {
-        doNotStrip("*/*")
+    packaging {
+        jniLibs {
+            keepDebugSymbols.add("**/*.so")
+        }
     }
 
     buildFeatures {
@@ -31,10 +33,6 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-}
-
-tasks.named("stripDebugDebugSymbols") {
-    enabled = false
 }
 
 dependencies {
