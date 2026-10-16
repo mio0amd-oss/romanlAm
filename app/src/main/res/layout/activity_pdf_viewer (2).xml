@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/readerRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/reader_background">
+
+    <!-- خودِ صفحات کتاب -->
+    <FrameLayout
+        android:id="@+id/pdfContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/reader_background" />
+
+    <!-- لایه‌ی روشنایی برای حالت شب (مثل فیلتر نور آبی) -->
+    <View
+        android:id="@+id/dimOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#00000000" />
+
+    <!-- نوار بالایی: با گرادیان، دکمه‌های بزرگ و عنوان متحرک -->
+    <LinearLayout
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@drawable/bg_toolbar_reader"
+        android:elevation="10dp"
+        android:gravity="center_vertical"
+        android:minHeight="58dp"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/reader_back"
+            android:src="@drawable/ic_back"
+            app:tint="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="marquee"
+            android:fontFamily="@font/vazirmatn"
+            android:gravity="center_vertical|end"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:maxLines="1"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:singleLine="true"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp" />
+
+        <ImageButton
+            android:id="@+id/btnNight"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/reader_night"
+            android:src="@drawable/ic_night"
+            app:tint="@color/accent" />
+
+        <ImageButton
+            android:id="@+id/btnSearch"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/reader_search"
+            android:src="@drawable/ic_search"
+            app:tint="@color/text_primary" />
+
+        <ImageButton
+            android:id="@+id/btnShare"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/reader_share"
+            android:src="@drawable/ic_share"
+            app:tint="@color/text_primary" />
+
+    </LinearLayout>
+
+    <!-- راهنمای کوچک پایین صفحه -->
+    <LinearLayout
+        android:id="@+id/bottomPill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_margin="14dp"
+        android:background="@drawable/bg_reader_pill"
+        android:elevation="10dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingTop="9dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="9dp">
+
+        <ImageView
+            android:layout_width="15dp"
+            android:layout_height="15dp"
+            android:contentDescription="@string/reader_title"
+            android:src="@drawable/ic_book"
+            app:tint="@color/accent" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="7dp"
+            android:fontFamily="@font/vazirmatn"
+            android:text="@string/reader_hint"
+            android:textColor="@color/text_secondary"
+            android:textSize="11.5sp" />
+
+    </LinearLayout>
+
+    <!-- پرده‌ی آماده‌سازی کتاب -->
+    <FrameLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_reader_loading"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp">
+
+            <FrameLayout
+                android:layout_width="84dp"
+                android:layout_height="84dp"
+                android:background="@drawable/bg_book_badge"
+                android:elevation="12dp">
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/reader_title"
+                    android:src="@drawable/ic_book"
+                    app:tint="@android:color/white" />
+
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:fontFamily="@font/vazirmatn"
+                android:text="@string/reader_preparing"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginTop="14dp"
+                android:indeterminateTint="@color/accent" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</FrameLayout>
