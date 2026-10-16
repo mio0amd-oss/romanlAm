@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">رمانیسم</string>
+    <string name="reader_title">رمانیسم ریدر</string>
+    <string name="reader_back">بازگشت</string>
+    <string name="reader_search">جست‌وجوی متن</string>
+    <string name="reader_share">اشتراک‌گذاری</string>
+    <string name="reader_night">حالت شب</string>
+    <string name="reader_preparing">در حال آماده‌سازی کتاب…</string>
+    <string name="reader_hint">برای پنهان کردن منو یک ضربه بزنید</string>
+    <string name="reader_night_off">حالت شب خاموش شد</string>
+    <string name="reader_night_soft">حالت شب: ملایم</string>
+    <string name="reader_night_strong">حالت شب: قوی</string>
+</resources>
